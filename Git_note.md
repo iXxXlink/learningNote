@@ -1,6 +1,19 @@
 ## Git
 
-1. 使用*git init*可以初始化一个仓库：直接使用git init，将当前目录设置为git仓库，在目录下新建一个.git目录
+### 初始化
+
+1. git init:初始化仓库
+2. git remote add origin git@github.com:userName/repositoryName.git：与自己github服务器的特定仓库连接
+
+### 上传已修改内容到git服务器
+
+1. git add .:添加所有修改过的文件到暂存区
+2. git commit -m “message”:将所有暂存区的文件保存到本地服务器
+3. git push origin master：将本地的提交传送到远程github服务器
+
+
+
+2. 使用*git init*可以初始化一个仓库：直接使用git init，将当前目录设置为git仓库，在目录下新建一个.git目录
 
 2. git init gittest：在当前目录下创建一个gittest目录，将该gittest目录作为git仓库，在里面新建一个.git目录
 
